@@ -2,10 +2,10 @@ import subprocess
 from enum import Enum
 
 class ASPM(Enum):
-    ASPM_DISABLED =   0x40
-    ASPM_L0s_ONLY =   0x41
-    ASPM_L1_ONLY =    0x42
-    ASPM_L1_AND_L0s = 0x43
+    ASPM_DISABLED =   0b00
+    ASPM_L0s_ONLY =   0b01
+    ASPM_L1_ONLY =    0b10
+    ASPM_L1_AND_L0s = 0b11
 
 root_complex = "00:1c.4"
 endpoint = "05:00.0"
@@ -68,15 +68,22 @@ def patch_device(addr):
     endpoint_bytes = read_all_bytes(addr)
     byte_position_to_patch = find_byte_to_patch(endpoint_bytes, 0x34)
 
-    print(f"Byte to patch: {hex(byte_position_to_patch)}")
+    print(f"Position of byte to patch: {hex(byte_position_to_patch)}")
     print(f"Byte is set to {hex(endpoint_bytes[byte_position_to_patch])}")
-    print(f"-> {ASPM(int(endpoint_bytes[byte_position_to_patch])).name}")
-    if int(endpoint_bytes[byte_position_to_patch]) != value_to_set.value:
+    print(f"-> {ASPM(int(endpoint_bytes[byte_position_to_patch]) & 0b11).name}")
+
+    if int(endpoint_bytes[byte_position_to_patch]) & 0b11 != value_to_set.value:
         print("Value doesn't match the one we want, setting it!")
-        patch_byte(addr, byte_position_to_patch, value_to_set.value)
+        
+        patched_byte = int(endpoint_bytes[byte_position_to_patch])
+        patched_byte = patched_byte >> 2
+        patched_byte = patched_byte << 2
+        patched_byte = patched_byte | value_to_set.value
+
+        patch_byte(addr, byte_position_to_patch, patched_byte)
         new_bytes = read_all_bytes(addr)
-        print(f"Byte is set to {hex(new_bytes[byte_position_to_patch])}")
-        print(f"-> {ASPM(int(new_bytes[byte_position_to_patch])).name}")
+        print(f"Byte is now set to {hex(new_bytes[byte_position_to_patch])}")
+        print(f"-> {ASPM(int(new_bytes[byte_position_to_patch]) & 0b11).name}")
     else:
         print("Nothing to patch!")
 
